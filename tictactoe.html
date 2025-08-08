@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe</title>
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        min-height: 100vh;
+        background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #fbc2eb, #a6c1ee);
+        background-size: 400% 400%;
+        animation: gradientBG 12s ease infinite;
+        color: #fff;
+        overflow-x: hidden;
+    }
+
+    @keyframes gradientBG {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    h1 {
+        margin-top: 30px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        z-index: 2;
+    }
+
+    .mode-select {
+        margin: 15px;
+        z-index: 2;
+    }
+    .mode-select button {
+        margin: 0 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        background: rgba(0,0,0,0.5);
+        color: #fff;
+        transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+    }
+    .mode-select button:hover {
+        transform: scale(1.05);
+        background: rgba(0,0,0,0.7);
+    }
+    .mode-select button.selected {
+        background: #ffcc00;
+        color: #000;
+        box-shadow: 0 0 12px #ffcc00;
+    }
+
+    .board {
+        display: grid;
+        grid-template-columns: repeat(3, 100px);
+        grid-gap: 8px;
+        margin: 20px;
+        background: linear-gradient(135deg, #6dd5fa, #2980b9);
+        padding: 10px;
+        border-radius: 12px;
+        z-index: 2;
+    }
+
+    .cell {
+        width: 100px;
+        height: 100px;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5em;
+        border-radius: 12px;
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.4s ease, background 0.3s ease;
+        color: white;
+        font-weight: bold;
+    }
+
+    .cell:hover {
+        background: rgba(255,255,255,0.4);
+        transform: scale(1.05);
+    }
+
+    .cell.taken {
+        pointer-events: none;
+    }
+
+    .cell.winner {
+        background: gold !important;
+        box-shadow: 0 0 20px gold;
+        animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+        0% { box-shadow: 0 0 10px gold; }
+        50% { box-shadow: 0 0 25px orange; }
+        100% { box-shadow: 0 0 10px gold; }
+    }
+
+    .message {
+        font-size: 1.3em;
+        margin-top: 15px;
+        z-index: 2;
+    }
+
+    .restart {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: rgba(0,0,0,0.5);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        color: #fff;
+        z-index: 2;
+    }
+
+    /* Confetti always on top */
+    canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 9999;
+    }
+</style>
+</head>
+<body>
+    <h1>🎯 Tic Tac Toe</h1>
+
+    <div class="mode-select">
+        <button onclick="startGame('human')">Two Player</button>
+        <button onclick="startGame('computer')">Play with Computer</button>
+    </div>
+
+    <div class="board"></div>
+    <div class="message"></div>
+    <button class="restart" onclick="restartGame()" style="display:none;">Restart</button>
+
+<canvas id="confetti"></canvas>
+
+<script>
+    const boardEl = document.querySelector('.board');
+    const messageEl = document.querySelector('.message');
+    const restartBtn = document.querySelector('.restart');
+    let board = Array(9).fill('');
+    let currentPlayer = 'X';
+    let gameActive = false;
+    let mode = null;
+
+    function startGame(selectedMode) {
+        mode = selectedMode;
+
+        // Highlight selected mode button
+        document.querySelectorAll('.mode-select button').forEach(btn => btn.classList.remove('selected'));
+        if (selectedMode === 'human') {
+            document.querySelector('.mode-select button:nth-child(1)').classList.add('selected');
+        } else {
+            document.querySelector('.mode-select button:nth-child(2)').classList.add('selected');
+        }
+
+        restartGame();
+    }
+
+    function renderBoard() {
+        boardEl.innerHTML = '';
+        board.forEach((val, i) => {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            if (val) cell.textContent = val;
+            if (val) cell.classList.add('taken');
+            cell.addEventListener('click', () => makeMove(i));
+            boardEl.appendChild(cell);
+        });
+    }
+
+    function makeMove(index) {
+        if (!gameActive || board[index]) return;
+        board[index] = currentPlayer;
+        renderBoard();
+        if (checkWin()) {
+            gameActive = false;
+            celebrateWin();
+            return;
+        }
+        if (board.every(cell => cell)) {
+            messageEl.textContent = "It's a Draw!";
+            restartBtn.style.display = 'block';
+            return;
+        }
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        if (mode === 'computer' && currentPlayer === 'O') {
+            setTimeout(computerMove, 500);
+        }
+    }
+
+    function computerMove() {
+        let emptyIndices = board.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+        let move = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+        makeMove(move);
+    }
+
+    function checkWin() {
+        const winPatterns = [
+            [0,1,2],[3,4,5],[6,7,8],
+            [0,3,6],[1,4,7],[2,5,8],
+            [0,4,8],[2,4,6]
+        ];
+        for (let pattern of winPatterns) {
+            const [a,b,c] = pattern;
+            if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                highlightWinner(pattern);
+                messageEl.textContent = `🎉 Player ${board[a]} Wins!`;
+                restartBtn.style.display = 'block';
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function highlightWinner(pattern) {
+        document.querySelectorAll('.cell').forEach((cell, i) => {
+            if (pattern.includes(i)) {
+                cell.classList.add('winner');
+            }
+        });
+    }
+
+    function restartGame() {
+        board = Array(9).fill('');
+        currentPlayer = 'X';
+        gameActive = true;
+        messageEl.textContent = '';
+        restartBtn.style.display = 'none';
+        renderBoard();
+    }
+
+    function celebrateWin() {
+        startConfetti();
+    }
+
+    // Confetti Animation
+    const confettiCanvas = document.getElementById('confetti');
+    const ctx = confettiCanvas.getContext('2d');
+    let confettiPieces = [];
+    resizeCanvas();
+
+    function resizeCanvas() {
+        confettiCanvas.width = window.innerWidth;
+        confettiCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function startConfetti() {
+        confettiPieces = [];
+        for (let i = 0; i < 200; i++) {
+            confettiPieces.push({
+                x: Math.random() * confettiCanvas.width,
+                y: Math.random() * confettiCanvas.height - confettiCanvas.height,
+                r: Math.random() * 6 + 4,
+                d: Math.random() * 50 + 50,
+                color: `hsl(${Math.random()*360},100%,50%)`,
+                tilt: Math.random() * 10 - 10
+            });
+        }
+        requestAnimationFrame(updateConfetti);
+    }
+
+    function updateConfetti() {
+        ctx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+        confettiPieces.forEach(p => {
+            p.y += Math.cos(p.d) + 1 + p.r/2;
+            p.x += Math.sin(p.d);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI*2, false);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+        });
+        if (confettiPieces.some(p => p.y < confettiCanvas.height)) {
+            requestAnimationFrame(updateConfetti);
+        }
+    }
+</script>
+</body>
+</html>
